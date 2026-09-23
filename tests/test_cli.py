@@ -46,6 +46,8 @@ class CliTest(unittest.TestCase):  # 전체 CLI 연결 동작 검사를 묶는�
             code, stdout, stderr = self.capture(["commit"])  # commit 명령을 실행하고 출력을 모은다.
         self.assertEqual(code, 2)  # 설정 오류 종료 번호여야 한다.
         self.assertIn("AI_API_KEY", stderr)  # 필요한 환경변수 이름을 안내해야 한다.
+        self.assertIn("cp .env.example .env", stderr)  # 프로젝트 루트에서 설정 파일을 만드는 복구 명령을 안내해야 한다.
+        self.assertIn("실제 Key", stderr)  # 복사 후 사용자가 바꿔야 할 값을 분명히 알려야 한다.
         self.assertNotIn("Traceback", stderr)  # 초보자에게 불필요한 내부 traceback은 없어야 한다.
         self.assertIn("Git status 수집 완료", stdout)  # API 전 단계인 Git 수집은 완료됐음을 보여야 한다.
 
@@ -60,6 +62,8 @@ class CliTest(unittest.TestCase):  # 전체 CLI 연결 동작 검사를 묶는�
         self.assertEqual(stderr, "")  # 오류 출력은 없어야 한다.
         self.assertIn("=== Commit Message ===", stdout)  # 결과 시작 헤더가 있어야 한다.
         self.assertIn("feat: 자동 생성 추가", stdout)  # AI 커밋 제목이 출력되어야 한다.
+        self.assertIn("[COPY] 위 구획 안의 텍스트", stdout)  # 커밋 메시지의 복사 가능 범위를 안내해야 한다.
+        self.assertIn("[TIP] 파라미터 비교", stdout)  # 같은 변경에서 옵션을 비교하는 방법을 안내해야 한다.
         self.assertEqual(generate.call_count, 1)  # API는 정확히 한 번만 호출되어야 한다.
         settings = generate.call_args.args[0]  # API 함수에 전달된 설정을 꺼낸다.
         self.assertEqual(settings.temperature, 0.1)  # 바꾼 temperature가 전달되어야 한다.
@@ -78,6 +82,8 @@ class CliTest(unittest.TestCase):  # 전체 CLI 연결 동작 검사를 묶는�
         self.assertIn("## Why\n- 이유", stdout)  # Why 섹션과 불릿이 있어야 한다.
         self.assertIn("## What\n- 변경", stdout)  # What 섹션과 불릿이 있어야 한다.
         self.assertIn("## How to Test\n- 확인", stdout)  # How to Test 섹션과 불릿이 있어야 한다.
+        self.assertIn("PR Title과 PR Body를 각각 복사", stdout)  # PR 제목과 본문의 복사 방법을 안내해야 한다.
+        self.assertIn("실제 변경·테스트·민감정보", stdout)  # PR 등록 전 검토할 핵심 항목을 안내해야 한다.
         self.assertEqual(generate.call_count, 1)  # API는 정확히 한 번만 호출되어야 한다.
 
     @patch("ai_gitgen.cli.collect_git_context")  # 실제 Git 수집을 가짜 함수로 바꾼다.

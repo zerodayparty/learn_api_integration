@@ -81,7 +81,7 @@ def build_parser() -> argparse.ArgumentParser:  # 전체 CLI 명령 구조를 �
 def _settings_from_args(args: argparse.Namespace) -> ApiSettings:  # CLI와 환경변수에서 API 설정을 만든다.
     api_key = os.getenv("AI_API_KEY", "").strip()  # 비밀 키는 명령 인자가 아니라 환경변수에서만 읽는다.
     if not api_key:  # 필수 API Key가 비어 있는지 확인한다.
-        raise ApiConfigurationError("AI_API_KEY 환경변수가 설정되지 않았습니다. 예: export AI_API_KEY=\"YOUR_KEY\"")  # 설정 방법과 함께 오류를 알린다.
+        raise ApiConfigurationError("AI_API_KEY 환경변수가 설정되지 않았습니다.\n[RECOVERY] 프로젝트 루트에서 cp .env.example .env 실행 후 .env에 실제 Key를 입력하세요.")  # 자동 로드되는 .env 생성 방법과 실제 Key 입력 위치를 함께 안내한다.
     api_url = (args.api_url or "").strip()  # .env 또는 명령 옵션으로 받은 전체 요청 주소의 공백을 제거한다.
     if not api_url:  # 임의의 서비스 주소로 대신 요청하지 않도록 필수 URL을 검사한다.
         raise ApiConfigurationError("AI_API_URL 환경변수가 설정되지 않았습니다. .env.example을 복사한 .env에 전체 엔드포인트를 입력하세요.")  # 필요한 파일과 변수 이름을 안내한다.
@@ -127,6 +127,7 @@ def run(args: argparse.Namespace) -> int:  # 해석된 옵션으로 Git 수집�
         print("\n=== Commit Message ===")  # 최종 결과의 시작 구획을 표시한다.
         print(result)  # 사용자가 복사할 커밋 메시지를 출력한다.
         print("=== End Commit Message ===")  # 최종 결과의 끝 구획을 표시한다.
+        print("[COPY] 위 구획 안의 텍스트를 복사해 커밋 메시지로 사용하세요.")  # 복사 가능한 범위를 사용자가 바로 알 수 있게 안내한다.
     else:  # PR 초안 명령을 처리한다.
         draft = format_pr_draft(raw_result)  # PR 제목과 본문을 필수 형식으로 정리한다.
         validate_pr_draft(draft)  # 출력 직전에 규칙을 한 번 더 검증한다.
@@ -136,7 +137,9 @@ def run(args: argparse.Namespace) -> int:  # 해석된 옵션으로 Git 수집�
         print("\n=== PR Body ===")  # PR 본문 구획을 표시한다.
         print(draft.body)  # 세 필수 섹션이 있는 본문을 출력한다.
         print("=== End PR Draft ===")  # 전체 PR 초안의 끝을 표시한다.
+        print("[COPY] PR Title과 PR Body를 각각 복사한 뒤 실제 변경·테스트·민감정보를 검토하세요.")  # 복사 대상과 PR 등록 전 검토 항목을 한 줄로 안내한다.
     print("\n[NOTICE] AI 초안은 사실과 민감정보를 검토한 뒤 사용하세요.")  # AI 결과를 바로 적용하지 말아야 함을 알린다.
+    print("[TIP] 파라미터 비교는 같은 Git 변경에서 temperature 또는 max_tokens만 바꿔 각각 실행하세요.")  # 공정한 비교를 위해 한 번에 한 조건만 바꾸라고 안내한다.
     return 0  # 전체 흐름이 성공했음을 운영체제에 알린다.
 
 

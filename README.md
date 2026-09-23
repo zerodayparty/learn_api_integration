@@ -138,6 +138,50 @@ python3 main.py pr -api-format anthropic -model "YOUR_MODEL_ID" -temperature 0.2
 
 <br><br>
 
+## 🟢 파라미터 비교 실습  
+
+비교할 때는 Git 변경 내용을 그대로 유지하고 한 번에 한 옵션만 바꾼다. 두 결과를 파일로 저장하면 눈으로 비교하기 쉽다. 각 명령은 AI API를 1회 호출하므로 아래 temperature 비교는 총 2회 요청한다.  
+
+### 🟡 temperature 0.0과 1.0 비교  
+
+```bash
+python3 main.py commit -temperature 0.0 -max-tokens 400 > result_temperature_0.txt  
+python3 main.py commit -temperature 1.0 -max-tokens 400 > result_temperature_1.txt  
+diff -u result_temperature_0.txt result_temperature_1.txt  
+```
+
+- `>`: 터미널 출력을 지정한 파일에 저장한다.  
+- `diff`: Difference의 뜻이며 두 파일의 다른 줄을 보여 준다.  
+- `-u`: Unified Format의 약자이며 앞뒤 문맥을 포함한 통합 형식으로 차이를 보여 준다.  
+
+| temperature | 예상되는 경향 | 출력 예시의 성격 |  
+| --- | --- | --- |
+| `0.0` | 표현 선택이 비교적 일정하고 보수적 | 같은 type과 비슷한 단어가 반복될 가능성이 큼 |  
+| `0.2` | 기본값이며 일관성과 자연스러움의 균형 | 커밋·PR 초안에 권장 |  
+| `0.8` | 표현과 요약 순서가 더 다양해질 수 있음 | 비교 실험용 |  
+| `1.0` | Anthropic 형식에서 허용하는 최대값 | 다양성이 커지지만 불필요한 표현도 늘 수 있음 |  
+
+예를 들어 같은 문서 변경도 `0.0`에서는 `docs(cli): add API setup guidance`처럼 직접적인 제목이 나오고, `1.0`에서는 다른 type이나 표현 순서를 선택할 수 있다. 이것은 이해를 위한 예상 예시이며 실제 문장은 모델 상태에 따라 달라진다. temperature가 같아도 결과 문장이 항상 같다고 보장되지는 않는다.  
+
+### 🟡 max_tokens 120과 700 비교  
+
+```bash
+python3 main.py pr -temperature 0.2 -max-tokens 120 > result_tokens_120.txt  
+python3 main.py pr -temperature 0.2 -max-tokens 700 > result_tokens_700.txt  
+diff -u result_tokens_120.txt result_tokens_700.txt  
+```
+
+`max_tokens`가 너무 작으면 AI가 PR JSON과 세 섹션을 완성하기 전에 다음처럼 출력이 끊길 수 있다.  
+
+```text
+{"title":"docs: 설정 안내 보완","body":"## Why\n- 설정 오류를 줄이기 위해\n\n## What\n- 환경변수 안내를
+[출력이 여기서 종료됨]
+```
+
+이 경우 `How to Test`가 생성되지 않거나 JSON(JavaScript Object Notation)이 닫히지 않아 원래 내용을 정확히 분리할 수 없다. 후처리가 기본 섹션을 보완하더라도 잘린 의미까지 복원할 수는 없다. 커밋은 약 `300~400`, 세 섹션이 필요한 PR은 약 `600~700`부터 실험하고, 실제 모델 응답 길이에 맞게 조정한다.  
+
+<br><br>
+
 ## 🟢 출력 예시  
 
 ### 🟡 커밋 메시지  
@@ -155,6 +199,10 @@ feat(cli): Git 변경 기반 메시지 생성 추가
 - Git 상태와 diff를 AI 프롬프트에 연결  
 - API 오류와 출력 형식 검증 추가  
 === End Commit Message ===  
+[COPY] 위 구획 안의 텍스트를 복사해 커밋 메시지로 사용하세요.  
+
+[NOTICE] AI 초안은 사실과 민감정보를 검토한 뒤 사용하세요.  
+[TIP] 파라미터 비교는 같은 Git 변경에서 temperature 또는 max_tokens만 바꿔 각각 실행하세요.  
 ```
 
 ### 🟡 PR 초안  
@@ -173,6 +221,10 @@ feat: AI 기반 Git 초안 생성 기능 추가
 ## How to Test  
 - python3 -m unittest discover -s tests -v 명령을 실행합니다.  
 === End PR Draft ===  
+[COPY] PR Title과 PR Body를 각각 복사한 뒤 실제 변경·테스트·민감정보를 검토하세요.  
+
+[NOTICE] AI 초안은 사실과 민감정보를 검토한 뒤 사용하세요.  
+[TIP] 파라미터 비교는 같은 Git 변경에서 temperature 또는 max_tokens만 바꿔 각각 실행하세요.  
 ```
 
 AI가 만든 내용은 코드와 일치하지 않을 수 있다. 복사하기 전에 파일명, 변경 이유, 테스트 결과, 민감정보 포함 여부를 직접 확인한다.  
@@ -220,7 +272,7 @@ AI REST API 1회 호출
 | Git 저장소가 아님 | 프로젝트 루트에서 실행하라는 오류와 종료 번호 `2` |  
 | Git 하위 폴더에서 실행 | 저장소 루트로 이동하라는 오류 |  
 | 변경 사항 없음 | API를 호출하지 않고 정상 종료 번호 `0` |  
-| API Key 없음 | `AI_API_KEY` 설정 방법 출력 |  
+| API Key 없음 | `cp .env.example .env` 복구 명령과 실제 Key 입력 위치 출력 |  
 | 보호 파일만 변경 | 외부 전송 없이 중단 |  
 | HTTP 인증·서버 오류 | 상태 코드와 안전하게 정리한 원인 출력 |  
 | 네트워크 시간 초과 | 네트워크 오류 원인 출력 |  
