@@ -14,7 +14,7 @@ from ai_gitgen.models import ApiSettings  # API 설정 데이터 구조를 가�
 from ai_gitgen.prompt_builder import SYSTEM_PROMPT, build_commit_prompt, build_pr_prompt  # 명령별 프롬프트 생성 함수를 가져온다.
 
 
-def load_dotenv(dotenv_path: str | Path | None = None, override: bool = False) -> None:  # 프로젝트 루트의 .env 값을 환경변수로 등록한다.
+def load_dotenv(dotenv_path: str | Path | None = None, override: bool = False, clear_missing_api_key: bool = False) -> None:  # 프로젝트 루트의 .env 값을 환경변수로 등록한다.
     path = Path(dotenv_path) if dotenv_path is not None else Path.cwd() / ".env"  # 별도 경로가 없으면 현재 프로젝트 루트의 .env를 고른다.
     if not path.is_file():  # .env 파일이 실제로 존재하는지 확인한다.
         return  # 파일이 없으면 이후 필수 설정 검사에서 정확한 변수 이름을 안내하게 한다.
@@ -22,6 +22,7 @@ def load_dotenv(dotenv_path: str | Path | None = None, override: bool = False) -
         lines = path.read_text(encoding="utf-8").splitlines()  # UTF-8 텍스트를 줄 단위로 안전하게 읽는다.
     except OSError as error:  # 권한이나 입출력 문제로 파일을 읽지 못한 경우를 잡는다.
         raise ApiConfigurationError(".env 파일을 읽을 수 없습니다. 파일 권한을 확인하세요.") from error  # 비밀값 없이 해결 방법을 알린다.
+    loaded_keys: set[str] = set()  # 주석이 아닌 실제 설정으로 선언된 환경변수 이름만 모은다.
     for line_number, raw_line in enumerate(lines, start=1):  # 각 줄과 사람이 확인하기 쉬운 줄 번호를 함께 순회한다.
         line = raw_line.strip()  # 줄 앞뒤의 공백을 제거한다.
         if not line or line.startswith("#"):  # 빈 줄 또는 설명 주석인지 확인한다.
@@ -35,12 +36,15 @@ def load_dotenv(dotenv_path: str | Path | None = None, override: bool = False) -
         value = value.strip()  # 환경변수 값 주변의 공백을 제거한다.
         if not key.isidentifier():  # Python 환경변수 이름으로 쓰기 어려운 잘못된 이름인지 검사한다.
             raise ApiConfigurationError(f".env {line_number}번째 줄의 환경변수 이름이 잘못되었습니다.")  # 실제 이름과 값은 출력하지 않는다.
+        loaded_keys.add(key)  # 이 이름이 .env의 활성 설정이라는 사실만 기록하고 값은 출력하지 않는다.
         has_double_quotes = value.startswith('"') and value.endswith('"')  # 값이 큰따옴표 한 쌍으로 감싸졌는지 확인한다.
         has_single_quotes = value.startswith("'") and value.endswith("'")  # 값이 작은따옴표 한 쌍으로 감싸졌는지 확인한다.
         if has_double_quotes or has_single_quotes:  # .env.example처럼 따옴표를 사용한 값인지 확인한다.
             value = value[1:-1]  # 환경변수에는 바깥쪽 따옴표를 제외한 실제 값만 저장한다.
         if override or key not in os.environ:  # 명시적 덮어쓰기이거나 기존 환경변수가 없는 경우인지 확인한다.
             os.environ[key] = value  # 비밀값을 출력하지 않고 현재 Python 프로세스에만 등록한다.
+    if clear_missing_api_key and "AI_API_KEY" not in loaded_keys:  # .env를 API Key의 기준으로 삼는데 활성 Key 줄이 없는지 확인한다.
+        os.environ.pop("AI_API_KEY", None)  # 부모 터미널이나 IDE에 남아 있던 Key가 몰래 사용되지 않도록 제거한다.
 
 
 def _temperature(value: str) -> float:  # CLI에서 받은 temperature 값을 검사한다.
@@ -145,7 +149,7 @@ def run(args: argparse.Namespace) -> int:  # 해석된 옵션으로 Git 수집�
 
 def main(argv: list[str] | None = None) -> int:  # 터미널 실행과 테스트에서 함께 쓸 진입점을 만든다.
     try:  # .env 로드부터 실행 오류까지 긴 traceback 없이 처리하기 시작한다.
-        load_dotenv()  # CLI 기본값을 만들기 전에 프로젝트 루트의 .env를 먼저 읽는다.
+        load_dotenv(override=True, clear_missing_api_key=True)  # .env가 있으면 그 안의 API Key 상태를 부모 환경보다 우선한다.
         parser = build_parser()  # .env가 등록된 뒤 명령과 옵션을 해석할 객체를 만든다.
         args = parser.parse_args(argv)  # 실제 입력 인자를 규칙에 따라 해석한다.
         return run(args)  # 전체 자동화 흐름을 실행하고 종료 번호를 받는다.

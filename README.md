@@ -90,7 +90,9 @@ AI_API_URL="https://example.com/v1/messages"
 
 - 실제 Key를 `.env.example`, README, 소스 코드, Git 커밋에 적지 않는다.  
 - 프로그램은 시작할 때 프로젝트 루트의 `.env`를 먼저 읽는다.
-- 이미 `export`로 설정된 환경변수는 `.env`보다 우선하며 자동으로 덮어쓰지 않는다.
+- `.env` 파일이 있으면 그 안의 `AI_API_KEY`가 부모 터미널이나 IDE의 환경변수보다 우선한다.
+- `.env`의 `AI_API_KEY`를 주석 처리하거나 지우면 부모 환경에 오래된 Key가 남아 있어도 설정 오류로 종료한다.
+- `.env` 파일 자체가 없는 Docker 실행은 `-e AI_API_KEY`로 전달한 환경변수를 사용할 수 있다.
 - `_temporary/models.json`은 프로그램이 읽지 않으며 Git과 AI 전송 대상에서 제외된다.  
 
 <br><br>

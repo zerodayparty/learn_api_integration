@@ -77,32 +77,51 @@ def _fallback_title_and_body(raw_text: str) -> tuple[str, str]:  # JSON이 아�
     return title, cleaned  # 찾은 제목과 전체 본문 후보를 돌려준다.
 
 
+# AI가 형식을 어겼을 때
 def format_pr_draft(raw_text: str) -> PullRequestDraft:  # AI PR 결과를 필수 구조로 정리한다.
+    
     parsed = _extract_json_object(raw_text)  # 우선 JSON 객체로 응답을 읽는다.
+    
     if parsed:  # JSON 객체를 정상적으로 찾았는지 확인한다.
         title = str(parsed.get("title", "")).strip()  # title 값을 문자열로 꺼낸다.
         body = str(parsed.get("body", "")).strip()  # body 값을 문자열로 꺼낸다.
+    
     else:  # JSON이 아닌 응답도 최대한 안전하게 보완한다.
         title, body = _fallback_title_and_body(raw_text)  # 일반 텍스트에서 제목과 본문을 찾는다.
+    
     if not title:  # PR 제목이 비어 있는지 확인한다.
         raise OutputFormatError("AI가 PR 제목을 생성하지 않았습니다.")  # 제목 없는 결과를 막는다.
+    
     title = _shorten_line(title, 80)  # 줄바꿈을 없애고 최대 80자로 제한한다.
+    
     why = _section_bullets(body, "Why", "What")  # Why 섹션 불릿을 읽는다.
+
     what = _section_bullets(body, "What", "How to Test")  # What 섹션 불릿을 읽는다.
+    
     how = _section_bullets(body, "How to Test", None)  # How to Test 섹션 불릿을 읽는다.
+    
     why = why or ["- Git 변경 사항의 목적을 명확히 설명하기 위해 작성했습니다."]  # 누락된 Why에 안전한 기본 불릿을 넣는다.
+    
     what = what or ["- 수집된 Git 변경 내용을 반영했습니다."]  # 누락된 What에 안전한 기본 불릿을 넣는다.
+    
     how = how or ["- 변경된 기능과 출력 형식을 직접 확인합니다."]  # 누락된 테스트 방법에 안전한 기본 불릿을 넣는다.
+    
     why_text = "\n".join(why)  # Python 3.10에서도 동작하도록 Why 불릿을 f-string 밖에서 합친다.
+    
     what_text = "\n".join(what)  # Python 3.10에서도 동작하도록 What 불릿을 f-string 밖에서 합친다.
+    
     how_text = "\n".join(how)  # Python 3.10에서도 동작하도록 How to Test 불릿을 f-string 밖에서 합친다.
+    
     normalized = f"## Why\n{why_text}\n\n## What\n{what_text}\n\n## How to Test\n{how_text}"  # 세 섹션을 요구된 순서로 다시 조립한다.
+    
     return PullRequestDraft(title=title, body=normalized)  # 검증과 보완을 마친 PR 초안을 돌려준다.
+
 
 
 def validate_pr_draft(draft: PullRequestDraft) -> None:  # 최종 PR 초안이 평가 규칙을 만족하는지 다시 확인한다.
     if "\n" in draft.title or len(draft.title) > 80:  # 제목이 한 줄이며 80자 이하인지 검사한다.
         raise OutputFormatError("PR 제목 길이 또는 줄 수 규칙을 만족하지 못했습니다.")  # 잘못된 제목을 출력하지 않는다.
+    
     for heading, next_heading in (("Why", "What"), ("What", "How to Test"), ("How to Test", None)):  # 필수 세 섹션을 차례대로 검사한다.
         if not _section_bullets(draft.body, heading, next_heading):  # 현재 섹션에 불릿이 하나라도 있는지 확인한다.
             raise OutputFormatError(f"PR 본문의 {heading} 섹션에 불릿이 없습니다.")  # 빠진 형식을 구체적으로 알린다.

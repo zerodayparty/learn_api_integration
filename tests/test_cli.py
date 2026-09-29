@@ -138,15 +138,43 @@ class CliTest(unittest.TestCase):  # 전체 CLI 연결 동작 검사를 묶는�
         with tempfile.TemporaryDirectory() as temp_directory:  # 테스트가 끝나면 자동 삭제되는 임시 폴더를 만든다.
             dotenv_path = Path(temp_directory) / ".env"  # 임시 프로젝트 루트의 .env 경로를 만든다.
             dotenv_path.write_text("AI_API_KEY=fake-key\nAI_API_FORMAT=anthropic\nAI_MODEL=fake-model\nAI_API_URL=https://example.test/v1/messages\n", encoding="utf-8")  # .env.example과 같은 네 가지 설정을 가짜 값으로 작성한다.
-            with patch("ai_gitgen.cli.Path.cwd", return_value=Path(temp_directory)), patch.dict(os.environ, {}, clear=True):  # 로더가 임시 .env만 읽도록 실행 위치와 환경을 격리한다.
+            with patch("ai_gitgen.cli.Path.cwd", return_value=Path(temp_directory)), patch.dict(os.environ, {"AI_API_KEY": "old-parent-key"}, clear=True):  # 오래된 부모 Key와 임시 .env를 함께 준비해 .env 우선순위를 검사한다.
                 code, stdout, stderr = self.capture(["commit"], load_environment=True)  # 실제 load_dotenv가 포함된 commit 흐름을 실행한다.
         self.assertEqual(code, 0)  # .env 설정만으로 정상 종료해야 한다.
         self.assertEqual(stderr, "")  # 설정 오류가 없어야 한다.
         self.assertIn("커밋 메시지 생성 완료", stdout)  # 가짜 API 응답까지 처리됐는지 확인한다.
         settings = generate.call_args.args[0]  # 가짜 API 함수가 받은 최종 설정을 꺼낸다.
+        self.assertEqual(settings.api_key, "fake-key")  # 부모 환경의 오래된 Key가 아니라 .env의 Key가 사용돼야 한다.
         self.assertEqual(settings.api_url, "https://example.test/v1/messages")  # .env의 URL이 그대로 사용됐는지 확인한다.
         self.assertEqual(settings.api_format, "anthropic")  # .env의 요청 형식이 사용됐는지 확인한다.
         self.assertEqual(settings.model, "fake-model")  # .env의 모델 ID가 사용됐는지 확인한다.
+
+    @patch("ai_gitgen.cli.generate_text")  # 실제 외부 API가 호출됐는지 검사할 가짜 함수를 만든다.
+    @patch("ai_gitgen.cli.collect_git_context")  # 실제 Git 상태 대신 변경 있음 상태를 돌려준다.
+    def test_commented_dotenv_key_rejects_parent_key(self, collect: object, generate: object) -> None:  # .env에서 Key를 주석 처리한 평가 상황을 재현한다.
+        collect.return_value = changed_context()  # API 설정 검사까지 진행되도록 변경 있음 상태를 만든다.
+        with tempfile.TemporaryDirectory() as temp_directory:  # 실제 .env를 건드리지 않는 임시 프로젝트 폴더를 만든다.
+            dotenv_path = Path(temp_directory) / ".env"  # 임시 폴더 안의 .env 경로를 만든다.
+            dotenv_path.write_text("# AI_API_KEY=commented\nAI_API_URL=https://example.test/v1/messages\n", encoding="utf-8")  # Key는 주석 처리하고 가짜 URL만 활성화한다.
+            with patch("ai_gitgen.cli.Path.cwd", return_value=Path(temp_directory)), patch.dict(os.environ, {"AI_API_KEY": "old-parent-key"}, clear=True):  # 부모 환경에 오래된 Key가 남은 상황을 안전한 가짜 값으로 만든다.
+                code, stdout, stderr = self.capture(["commit"], load_environment=True)  # 실제 .env 로더를 포함한 commit 흐름을 실행한다.
+        self.assertEqual(code, 2)  # API Key 누락은 설정 오류 종료 번호여야 한다.
+        self.assertIn("AI_API_KEY", stderr)  # 사용자가 누락된 설정 이름을 바로 알 수 있어야 한다.
+        self.assertIn("Git status 수집 완료", stdout)  # 설정 검사 전까지의 Git 수집은 정상 동작해야 한다.
+        generate.assert_not_called()  # 부모 환경의 오래된 Key로 외부 API를 호출하면 안 된다.
+
+    @patch("ai_gitgen.cli.generate_text")  # 실제 외부 API 대신 안전한 가짜 응답을 돌려준다.
+    @patch("ai_gitgen.cli.collect_git_context")  # 실제 Git 상태 대신 변경 있음 상태를 돌려준다.
+    def test_missing_dotenv_allows_injected_environment(self, collect: object, generate: object) -> None:  # .env가 없는 Docker 방식의 환경변수 주입을 검사한다.
+        collect.return_value = changed_context()  # API 설정 검사와 가짜 호출까지 진행되도록 변경 있음 상태를 만든다.
+        generate.return_value = "feat: injected environment"  # 네트워크 없이 성공 흐름을 끝낼 가짜 결과를 만든다.
+        with tempfile.TemporaryDirectory() as temp_directory:  # .env가 없는 임시 프로젝트 폴더를 만든다.
+            with patch("ai_gitgen.cli.Path.cwd", return_value=Path(temp_directory)), patch.dict(os.environ, {"AI_API_KEY": "injected-fake-key", "AI_API_URL": "https://example.test/v1/messages"}, clear=True):  # Docker의 -e 옵션과 같은 가짜 환경변수를 주입한다.
+                code, stdout, stderr = self.capture(["commit"], load_environment=True)  # 실제 로더가 .env 없음 상태를 처리하게 한다.
+        self.assertEqual(code, 0)  # .env가 없으면 주입된 환경변수로 정상 실행돼야 한다.
+        self.assertEqual(stderr, "")  # 올바른 주입 설정에는 오류가 없어야 한다.
+        self.assertIn("커밋 메시지 생성 완료", stdout)  # 가짜 API 응답까지 처리됐는지 확인한다.
+        self.assertEqual(generate.call_args.args[0].api_key, "injected-fake-key")  # 주입한 가짜 Key가 설정 객체에 전달돼야 한다.
 
 
 if __name__ == "__main__":  # 이 테스트 파일을 직접 실행했는지 확인한다.
