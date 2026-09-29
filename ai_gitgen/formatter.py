@@ -51,18 +51,25 @@ def format_commit_message(raw_text: str) -> str:  # AI 커밋 메시지를 최�
 
 
 def _extract_json_object(text: str) -> dict[str, object]:  # AI 응답에서 첫 JSON 객체를 찾아 읽는다.
-    cleaned = _strip_code_fence(text)  # JSON 주변의 코드 울타리를 제거한다.
+    
+    cleaned = _strip_code_fence(text)  # ✅ 🔥🔥🔥🔥🔥 JSON 주변의 markdown 코드 울타리를 제거한다.
+
+
     try:  # 응답 전체가 JSON인 일반 경우를 먼저 시도한다.
         value = json.loads(cleaned)  # 문자열을 Python 값으로 바꾼다.
+    
     except json.JSONDecodeError:  # JSON 앞뒤에 설명이 붙은 경우를 처리한다.
         start = cleaned.find("{")  # 첫 여는 중괄호 위치를 찾는다.
         end = cleaned.rfind("}")  # 마지막 닫는 중괄호 위치를 찾는다.
+    
         if start < 0 or end <= start:  # JSON 객체 모양조차 없는지 확인한다.
             return {}  # 아래의 텍스트 형식 보완 로직을 사용하도록 빈 값을 돌려준다.
+    
         try:  # 찾아낸 중괄호 범위만 다시 JSON으로 읽는다.
             value = json.loads(cleaned[start:end + 1])  # 객체처럼 보이는 부분을 Python 값으로 바꾼다.
         except json.JSONDecodeError:  # 중괄호 안도 올바른 JSON이 아닌 경우를 처리한다.
             return {}  # 텍스트 형식 보완 로직을 사용하도록 빈 값을 돌려준다.
+    
     return value if isinstance(value, dict) else {}  # 객체일 때만 사용하고 다른 JSON 종류는 버린다.
 
 
@@ -73,10 +80,12 @@ def _section_bullets(body: str, heading: str, next_heading: str | None) -> list[
     if not match:  # 요청한 섹션이 없었는지 확인한다.
         return []  # 보완 로직이 작동하도록 빈 목록을 돌려준다.
     bullets = []  # 정리된 불릿을 담을 목록을 만든다.
+    
     for line in match.group(1).splitlines():  # 섹션 내용을 한 줄씩 검사한다.
         content = re.sub(r"^\s*[-*+]\s*", "", line).strip()  # 기존 불릿 기호와 주변 공백을 제거한다.
         if content:  # 실제 내용이 있는 줄인지 확인한다.
             bullets.append(f"- {content}")  # 모든 항목을 요구 형식인 하이픈 불릿으로 통일한다.
+    
     return bullets  # 정리한 섹션 불릿을 돌려준다.
 
 
@@ -108,17 +117,15 @@ def format_pr_draft(raw_text: str) -> PullRequestDraft:  # AI PR 결과를 필�
     # ✅ 🔥🔥🔥🔥🔥 pr message title limit
     title = _shorten_line(title, 80)  # 줄바꿈을 없애고 최대 80자로 제한한다.
     
-    why = _section_bullets(body, "Why", "What")  # Why 섹션 불릿을 읽는다.
 
+    # ✅ 🔥🔥🔥🔥🔥 pr message body / 불릿 처리
+    why = _section_bullets(body, "Why", "What")  # Why 섹션 불릿을 읽는다.
     what = _section_bullets(body, "What", "How to Test")  # What 섹션 불릿을 읽는다.
-    
     how = _section_bullets(body, "How to Test", None)  # How to Test 섹션 불릿을 읽는다.
-    
     why = why or ["- Git 변경 사항의 목적을 명확히 설명하기 위해 작성했습니다."]  # 누락된 Why에 안전한 기본 불릿을 넣는다.
-    
     what = what or ["- 수집된 Git 변경 내용을 반영했습니다."]  # 누락된 What에 안전한 기본 불릿을 넣는다.
-    
     how = how or ["- 변경된 기능과 출력 형식을 직접 확인합니다."]  # 누락된 테스트 방법에 안전한 기본 불릿을 넣는다.
+    
     
     why_text = "\n".join(why)  # Python 3.10에서도 동작하도록 Why 불릿을 f-string 밖에서 합친다.
     
