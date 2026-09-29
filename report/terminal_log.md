@@ -40,7 +40,8 @@ feat(cli): .env 파일 자동 로드 및 코드 정리
 [INFO] 안전 모드 전송 제한이 적용되었습니다.  
 [INFO] AI API 요청 중... (이번 실행 1회)  
 [DONE] PR 초안 생성 완료  
-
+```
+```md
 === PR Title ===  
 .env 파일 자동 로드 기능 추가 및 코드 포맷팅 개선  
 
@@ -69,9 +70,48 @@ feat(cli): .env 파일 자동 로드 및 코드 정리
 
 
 
+
 <br><br>
 
-## 🟢 3. -temperature 0  
+## 🟢 3. API Key가 없는 상태에서 실행하면 오류 메시지가 출력되고 종료되는가?  
+
+- API 주석 처리  
+
+### 🟡 결과  
+device@user learn_api_integration % python3 main.py commit  
+[INFO] Git status 수집 완료: 3개 파일 변경 감지  
+[INFO] Git diff 수집 완료: 92줄  
+[INFO] 안전 모드: ON  
+[ERROR] AI_API_KEY 환경변수가 설정되지 않았습니다.  
+[RECOVERY] 프로젝트 루트에서 cp .env.example .env 실행 후 .env에 실제 Key를 입력하세요.  
+
+
+
+
+
+
+
+
+
+<br><br>
+
+## 🟢 4. Git 변경 사항이 없으면 안내 메시지를 출력하고 종료하는가?  
+
+- 변경사항 없는 상태  
+
+device@user learn_api_integration % python3 main.py commit  
+[INFO] 변경 사항이 없습니다. 초안을 생성하지 않고 종료합니다.  
+
+
+
+
+
+
+
+
+<br><br>
+
+## 🟢 5. -temperature 0  
 
 ### 🟡 % python3 main.py commit -temperature 0.0 -max-tokens 300                       
 
