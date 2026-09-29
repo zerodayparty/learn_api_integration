@@ -16,24 +16,37 @@ def _strip_code_fence(text: str) -> str:  # AI가 실수로 붙인 Markdown 코�
 
 def _shorten_line(text: str, maximum: int) -> str:  # 한 줄 제목을 지정 길이 안으로 줄인다.
     one_line = " ".join(text.split())  # 줄바꿈과 연속 공백을 한 칸으로 바꾼다.
+    
     if len(one_line) <= maximum:  # 이미 최대 길이 안인지 확인한다.
         return one_line  # 손댈 필요 없는 제목을 그대로 돌려준다.
+    
     shortened = one_line[:maximum].rstrip()  # 최대 길이까지만 남기고 끝 공백을 없앤다.
+    
     return shortened  # 말줄임표를 더해 길이를 넘기지 않고 결과를 돌려준다.
+
 
 
 def format_commit_message(raw_text: str) -> str:  # AI 커밋 메시지를 최대 72자 제목 규칙에 맞춘다.
     cleaned = _strip_code_fence(raw_text)  # 불필요한 코드 울타리를 먼저 없앤다.
+    
     lines = [line.rstrip() for line in cleaned.splitlines()]  # 각 줄 끝 공백을 제거한다.
+    
     while lines and (not lines[0].strip() or re.match(r"(?i)^[-#* ]*commit message\s*:?-*$", lines[0].strip())):  # 빈 줄이나 라벨이 맨 앞에 있는지 확인한다.
         lines.pop(0)  # 실제 제목 앞의 불필요한 줄을 제거한다.
+    
     if not lines:  # 정리 후 사용할 텍스트가 남았는지 확인한다.
         raise OutputFormatError("AI가 커밋 메시지 내용을 생성하지 않았습니다.")  # 빈 결과를 사용자에게 알린다.
+
+    # ✅ 🔥🔥🔥🔥🔥 commit message title limit    
     title = _shorten_line(lines[0].lstrip("#*- "), 72)  # 제목 장식을 제거하고 최대 72자로 제한한다.
+    
     if not title:  # 장식을 없앤 제목이 비었는지 확인한다.
         raise OutputFormatError("AI가 유효한 커밋 제목을 생성하지 않았습니다.")  # 복사할 수 없는 결과를 막는다.
+    
     body_lines = [line for line in lines[1:] if line.strip()]  # 제목 뒤 빈 줄을 제외한 본문만 모은다.
+    
     body = "\n".join(body_lines).strip()  # 남은 본문 줄을 다시 합친다.
+    
     return f"{title}\n\n{body}" if body else title  # 본문이 있을 때만 빈 줄과 함께 붙인다.
 
 
@@ -92,6 +105,7 @@ def format_pr_draft(raw_text: str) -> PullRequestDraft:  # AI PR 결과를 필�
     if not title:  # PR 제목이 비어 있는지 확인한다.
         raise OutputFormatError("AI가 PR 제목을 생성하지 않았습니다.")  # 제목 없는 결과를 막는다.
     
+    # ✅ 🔥🔥🔥🔥🔥 pr message title limit
     title = _shorten_line(title, 80)  # 줄바꿈을 없애고 최대 80자로 제한한다.
     
     why = _section_bullets(body, "Why", "What")  # Why 섹션 불릿을 읽는다.
